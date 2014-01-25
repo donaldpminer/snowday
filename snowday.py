@@ -1,4 +1,4 @@
-from flask import Flask, session, redirect, url_for, escape, request
+from flask import Flask, session, redirect, url_for, escape, request, render_template, Markup
 from redis import StrictRedis
 from datetime import datetime
 
@@ -27,6 +27,10 @@ def today():
 def right_now():
     return str(datetime.now())
 
+
+@app.route('/test')
+def test():
+    return render_template('index.html', name='foo')
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
