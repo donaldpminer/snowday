@@ -3,16 +3,22 @@
 
 
 <!-- header for login in formation -->
-
-<p>Logged in as <b>{{ session['username'] }}</b> <a href='/logout'>Log Out</a></p>
+<p><a href="/">home</a> <a href="/list">employee list</a></p>
+<p>Logged in as <b>{{ session['username'] }}</b></p>
+<p><a href='/logout'>Log Out</a></p>
 <hr>
 
 <!-- form for submitting a new status -->
 
         <form action="" method="post">
-            <p><input type=text name=name> Name of employee</input</p>
+            <select name=name><option>Select Employee...</option>
+                {% for emp in employees %}
+                    <option>{{ emp }}</option>
+                {% endfor %}
+            </select>
+            <!--<p><input type=text name=name> Name of employee</input></p>-->
             <p><input type=text name=time> Time coming in</input></p>
-            <p><input type=text name=comments> Comments</input</p>
+            <p><input type=text name=comments> Comments</input></p>
             <p><input type=submit value=Post>
         </form>
 

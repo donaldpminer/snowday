@@ -1,0 +1,38 @@
+<!doctype html>
+<title>SNOWDAY</title>
+
+
+<!-- header for login in formation -->
+<p><a href="/">home</a> <a href="/list">employee list</a></p>
+<p>Logged in as <b>{{ session['username'] }}</b></p>
+<p><a href='/logout'>Log Out</a></p>
+<hr>
+
+<!-- form for submitting a new status -->
+
+        <form action="" method="post">
+            <p><input type=text name=name></input>
+            <input type=submit value="Add employee">
+        </form>
+
+<hr>
+
+<!-- today's checkins -->
+
+
+        <table border=1 cellpadding=4>
+            <tr><td><b>Employee Name</b></td><td></td></tr>
+
+ {% for emp in emps %}
+    <tr>
+      <td>{{ emp }}</td>
+      <td>
+        <form action="" method="post">
+            <input type="hidden" name=removename value="{{ emp }}"></input>
+            <input type=submit value="Remove"></input>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+
+          </table>
