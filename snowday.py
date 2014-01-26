@@ -1,9 +1,12 @@
 from flask import Flask, session, redirect, url_for, escape, request, render_template, Markup
 from redis import StrictRedis
 from datetime import datetime
+import json
 
 app = Flask(__name__)
 app.debug = True
+
+STATUS_EXPIRATION = 64800 # 18 hours in seconds
 
 def get_redis(host='localhost', port=6379):
     return StrictRedis(host, port)
@@ -34,7 +37,7 @@ def index():
 
     if request.method == 'GET':
         return render_template('index.html', \
-                checkins=xlist_todays_checkins(), \
+                checkins=list_todays_checkins(), \
                 employees=get_employees())
 
     elif request.method == 'POST':
@@ -46,17 +49,27 @@ def index():
         if not redis.sismember('employees', request.form['name']):
             return "ERROR %s employee does not exists" % request.form['name']
 
-        redis.hset('checkins', request.form['name'][:30].replace('|', '').strip(), \
-            '%s|%s|%s|%s' % ( \
-                request.form['time'][:30].replace('|', '').strip(), \
-                request.form['comments'][:200].replace('|', '').strip(), \
+        redis.hset('checkins', \
+            request.form['name'][:30].strip(), \
+            gen_checkin_json(\
+                request.form['name'][:30].strip(), \
+                request.form['time'][:30].strip(), \
+                request.form['comments'][:200].strip(), \
                 session['username'], \
                 str(right_now())))
 
         return redirect(url_for('index'))
 
+def gen_checkin_json(name='', timein='', comments='', author='', time=''):
+    obj = {'name' : name, \
+           'timein' : timein, \
+           'comments':comments, \
+           'author':author, \
+           'time':time }
 
-def xlist_todays_checkins():
+    return json.dumps(obj)
+
+def list_todays_checkins():
     redis = get_redis()
 
     out = []
@@ -65,11 +78,26 @@ def xlist_todays_checkins():
         result = redis.hget('checkins', emp)
 
         if result is None:
-            out.append(tuple([emp] + ['','','','']))
+            out.append({'name' : emp, 'time' : 'UNKNOWN'})
         else:
-            out.append(tuple([emp] + result.split('|')))
+            # TODO: actually check to see if this was from today
+            out.append(json.loads(result))
 
     return out
+
+@app.route('/raw/status/<user>.json', methods=['GET'])
+def raw_checkin(user):
+    if 'username' not in session:
+        return 'you are not logged in'
+
+    return get_redis().hget('checkins', user)
+
+@app.route('/raw/employeelist.json', methods=['GET'])
+def raw_employeelist():
+    if 'username' not in session:
+        return 'you are not logged in'
+
+    return json.dumps(get_employees())
 
 @app.route('/list', methods=['GET', 'POST'])
 def employeelist():
@@ -96,7 +124,7 @@ def get_employees():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        session['username'] = request.form['username'].replace('|')
+        session['username'] = request.form['username']
         return redirect(url_for('index'))
     return '''
         <form action="" method="post">

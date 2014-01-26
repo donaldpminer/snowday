@@ -22,6 +22,7 @@
             <p><input type=submit value=Post>
         </form>
 
+
 <hr>
 
 <!-- today's checkins -->
@@ -31,11 +32,11 @@
             <tr><td><b>Employee Name</b></td><td><b>Time Coming In</b></td><td><b>Comments</b></td><td><b>Author</b></td><td><b>Check-in Time</b></td></tr>
 
  {% for line in checkins %}
-    <tr><td>{{ line[0] }}</td>
-        <td>{{ line[1] }}</td>
-        <td>{{ line[2] }}</td>
-        <td>{{ line[3] }}</td>
-        <td>{{ line[4] }}</td>
+    <tr><td>{{ line['name'] }}</td>
+        <td>{{ line['timein'] }}</td>
+        <td>{{ line['comments'] }}</td>
+        <td>{{ line['author'] }}</td>
+        <td>{{ line['time'] }}</td>
     </tr>
   {% endfor %}
 
