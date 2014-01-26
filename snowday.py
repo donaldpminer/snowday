@@ -30,7 +30,7 @@ def right_now():
 
 @app.route('/test')
 def test():
-    return render_template('index.html', name='foo')
+    return render_template('index.html', name=['foo','bar'])
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -38,14 +38,8 @@ def index():
         return redirect(url_for('login'))
 
     if request.method == 'GET':
-        return header_string() + '''
-        <form action="" method="post">
-            <p><input type=text name=name> Name of employee</input</p>
-            <p><input type=text name=time> Time coming in</input></p>
-            <p><input type=text name=comments> Comments</input</p>
-            <p><input type=submit value=Post>
-        </form>
-''' + list_todays_checkins()
+        return render_template('index.html', checkins=list_todays_checkins())
+
     elif request.method == 'POST':
         get_redis().lpush('ci-%s' % today(), \
             '%s|%s|%s|%s|%s' % ( \
@@ -57,18 +51,10 @@ def index():
 
         return redirect(url_for('index'))
 
+
 def list_todays_checkins():
-    checkins = get_redis().lrange('ci-%s' % today(), 0, -1)
-    out_str = '''
-        <table border=1 cellpadding=4>
-            <tr><td>Employee Name</td><td>Time Coming In</td><td>Comments</td><td>Author</td><td>Check-in Time</td></tr>
-'''
-    for checkin in checkins:
-        out_str += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>' % tuple(checkin.split('|'))
+    return [ c.split('|') for c in get_redis().lrange('ci-%s' % today(), 0, -1) ]
 
-    out_str += '</table>'
-
-    return out_str
 
 
 @app.route('/login', methods=['GET', 'POST'])

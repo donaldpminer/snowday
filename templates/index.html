@@ -1,7 +1,36 @@
 <!doctype html>
-<title>Hello from Flask</title>
-{% if name %}
-  <h1>Hello {{ name }}!</h1>
-{% else %}
-  <h1>Hello World!</h1>
-{% endif %}
+<title>SNOWDAY</title>
+
+
+<!-- header for login in formation -->
+
+<p>Logged in as <b>{{ session['username'] }}</b> <a href='/logout'>Log Out</a></p>
+<hr>
+
+<!-- form for submitting a new status -->
+
+        <form action="" method="post">
+            <p><input type=text name=name> Name of employee</input</p>
+            <p><input type=text name=time> Time coming in</input></p>
+            <p><input type=text name=comments> Comments</input</p>
+            <p><input type=submit value=Post>
+        </form>
+
+<hr>
+
+<!-- today's checkins -->
+
+
+        <table border=1 cellpadding=4>
+            <tr><td><b>Employee Name</b></td><td><b>Time Coming In</b></td><td><b>Comments</b></td><td><b>Author</b></td><td><b>Check-in Time</b></td></tr>
+
+ {% for line in checkins %}
+    <tr><td>{{ line[0] }}</td>
+        <td>{{ line[1] }}</td>
+        <td>{{ line[2] }}</td>
+        <td>{{ line[3] }}</td>
+        <td>{{ line[4] }}</td>
+    </tr>
+  {% endfor %}
+
+          </table>
