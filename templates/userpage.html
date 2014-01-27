@@ -1,0 +1,25 @@
+<!doctype html>
+<title>SNOWDAY</title>
+
+
+<!-- header for login in formation -->
+<p><a href="/">home</a> <a href="/list">employee list</a></p>
+<p>Logged in as <b>{{ session['username'] }}</b></p>
+<p><a href='/logout'>Log Out</a></p>
+<hr>
+
+<p>History of check-ins for user <b>{{ username }}</b>:</p>
+
+        <table border=1 cellpadding=4>
+            <tr><td><b>Employee Name</b></td><td><b>Time Coming In</b></td><td><b>Comments</b></td><td><b>Author</b></td><td><b>Check-in Time</b></td></tr>
+
+ {% for line in checkins %}
+    <tr><td>{{ line['name'] }}</td>
+        <td>{{ line['timein'] }}</td>
+        <td>{{ line['comments'] }}</td>
+        <td>{{ line['author'] }}</td>
+        <td>{{ line['time'] }}</td>
+    </tr>
+  {% endfor %}
+
+          </table>

@@ -32,7 +32,7 @@
             <tr><td><b>Employee Name</b></td><td><b>Time Coming In</b></td><td><b>Comments</b></td><td><b>Author</b></td><td><b>Check-in Time</b></td></tr>
 
  {% for line in checkins %}
-    <tr><td>{{ line['name'] }}</td>
+    <tr><td><a href='/user/{{ line['name'] }}'>{{ line['name'] }}</a></td>
         <td>{{ line['timein'] }}</td>
         <td>{{ line['comments'] }}</td>
         <td>{{ line['author'] }}</td>

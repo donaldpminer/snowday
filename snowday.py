@@ -2,11 +2,11 @@ from flask import Flask, session, redirect, url_for, escape, request, render_tem
 from redis import StrictRedis
 from datetime import datetime
 import json
+import time
 
 app = Flask(__name__)
 app.debug = True
 
-STATUS_EXPIRATION = 64800 # 18 hours in seconds
 
 def get_redis(host='localhost', port=6379):
     return StrictRedis(host, port)
@@ -28,7 +28,10 @@ def today():
     return str(datetime.now().date())
 
 def right_now():
-    return str(datetime.now())[:-10]
+    return int(time.time())
+
+def ts2datestr(ts):
+    return datetime.fromtimestamp(ts)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -47,12 +50,12 @@ def index():
             return redirect(url_for('index'))
 
         if not redis.sismember('employees', request.form['name']):
+            # this should never happen
             return "ERROR %s employee does not exists" % request.form['name']
 
-        redis.hset('checkins', \
-            request.form['name'][:30].strip(), \
+        redis.lpush('ci:%s' % request.form['name'], \
             gen_checkin_json(\
-                request.form['name'][:30].strip(), \
+                request.form['name'], \
                 request.form['time'][:30].strip(), \
                 request.form['comments'][:200].strip(), \
                 session['username'], \
@@ -61,11 +64,11 @@ def index():
         return redirect(url_for('index'))
 
 def gen_checkin_json(name='', timein='', comments='', author='', time=''):
-    obj = {'name' : name, \
-           'timein' : timein, \
-           'comments':comments, \
-           'author':author, \
-           'time':time }
+    obj = {'name' : str(name), \
+           'timein' : str(timein), \
+           'comments': str(comments), \
+           'author': str(author), \
+           'time': int(time) }
 
     return json.dumps(obj)
 
@@ -75,15 +78,36 @@ def list_todays_checkins():
     out = []
 
     for emp in get_employees():
-        result = redis.hget('checkins', emp)
+        # get the first element from ci:<username>, which is the most recent one
+        result = redis.lindex('ci:%s' % emp, 0)
 
         if result is None:
-            out.append({'name' : emp, 'time' : 'UNKNOWN'})
+            out.append({'name' : emp, 'time' : 'NONE EVER'})
         else:
-            # TODO: actually check to see if this was from today
-            out.append(json.loads(result))
+            obj = json.loads(result)
+
+            # if the status was less than a day ago
+            # (1 day = 86400 seconds)
+            if time.time() - int(obj['time']) <= 86400:
+                # change it from time stamp to readable string
+                obj['time'] = str(datetime.fromtimestamp(int(obj['time'])))
+
+                out.append(obj)
+            else:
+                out.append({'name' : emp, 'time': 'NONE TODAY'})
 
     return out
+
+@app.route('/user/<user>', methods=['GET'])
+def userpage(user):
+    if 'username' not in session:
+        return redirect(url_for('login'))
+
+    checkins = [ json.loads(ci) for ci in get_redis().lrange('ci:%s' % user, 0, -1) ]
+    for ci in checkins:
+        ci['time'] = str(datetime.fromtimestamp(int(ci['time'])))
+    
+    return render_template('userpage.html', checkins=checkins, username=user)
 
 @app.route('/raw/status/<user>.json', methods=['GET'])
 def raw_checkin(user):
@@ -124,8 +148,19 @@ def get_employees():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        session['username'] = request.form['username']
-        return redirect(url_for('index'))
+        un = request.form['username']
+        if get_redis().sismember('employees', un) or un == 'admin':
+            session['username'] = un
+            return redirect(url_for('index'))
+        else:
+            return '''
+        <p>Member <b>%s</b> does not exist. Try again</p>
+
+        <form action="" method="post">
+            <p><input type=text name=username> User Name</input></p>
+            <p><input type=submit value=Login></input></p>
+        </form>
+    ''' % un
     return '''
         <form action="" method="post">
             <p><input type=text name=username> User Name</input></p>
