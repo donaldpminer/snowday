@@ -68,14 +68,17 @@ def index():
     if 'username' not in session:
         return redirect(url_for('login'))
 
+    # this happens when someone is just checking out the index page
     if request.method == 'GET':
         return render_template('index.html', \
                 checkins=list_todays_checkins(), \
                 employees=get_employees())
 
+    # this happens when someone is trying to checkin
     elif request.method == 'POST':
         redis = get_redis()
 
+        # this means they didn't select an employee
         if request.form['name'] == 'Select Employee...':
             return redirect(url_for('index'))
 
@@ -83,6 +86,7 @@ def index():
             # this should never happen
             return "ERROR %s employee does not exists" % request.form['name']
 
+        # ok, we're good to go
         redis.lpush('ci:%s' % request.form['name'], \
             gen_checkin_json(\
                 request.form['name'], \
@@ -93,13 +97,17 @@ def index():
 
         return redirect(url_for('index'))
 
-
+# this page shows information about a user
 @app.route('/user/<user>', methods=['GET'])
 def userpage(user):
     if 'username' not in session:
         return redirect(url_for('login'))
 
+    # convert each checkin from a json string into a dict
     checkins = [ json.loads(ci) for ci in get_redis().lrange('ci:%s' % user, 0, -1) ]
+
+    # this goes through and changes timestamps to time strings
+    #   can this be done in javascript?
     for ci in checkins:
         ci['time'] = str(datetime.fromtimestamp(int(ci['time'])))
     
@@ -111,9 +119,11 @@ def employeelist():
     if 'username' not in session:
         return redirect(url_for('login'))
 
+    # this happens when someone is just visiting the employee list
     if request.method == 'GET':
         return render_template('list.html', emps=get_employees())
 
+    # this happens when someone tried to do something on the employee list
     elif request.method == 'POST':
         # the user tried to remove someone
         if 'removename' in request.form:
@@ -151,14 +161,21 @@ def raw_employeelist():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+
+    # this user is trying to login
     if request.method == 'POST':
         un = request.form['username']
+
+        # if this is a good login
         if get_redis().sismember('employees', un) or un == 'admin':
             session['username'] = un
             return redirect(url_for('index'))
+
+        # if this is a bad login
         else:
             return render_template('login.html', error_message='user "%s" doesn\'t exist' % un)
 
+    # this user is trying to see the login page
     return render_template('login.html')
 
 @app.route('/logout')
