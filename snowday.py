@@ -6,32 +6,62 @@ import time
 
 app = Flask(__name__)
 app.debug = True
+app.secret_key = 'i guess i should figure out a way to make this more secure'
 
+# HELPER FUNCTIONS
 
+# returns an active client to the redis instance
 def get_redis(host='localhost', port=6379):
     return StrictRedis(host, port)
 
-def header_string():
-    if 'username' in session:
-        return '''
-Logged in as <b>%s</b> <a href='/logout'>Log Out</a>
-<hr>
-''' % escape(session['username'])
-    else:
-        return '''
-<a href='/login'>Login</a>
-<hr>
-
-'''
-
-def today():
-    return str(datetime.now().date())
-
+# returns the timestamp of right now
 def right_now():
     return int(time.time())
 
-def ts2datestr(ts):
-    return datetime.fromtimestamp(ts)
+# get a list of employees
+def get_employees():
+    return sorted(get_redis().smembers('employees'))
+
+# produces a json string from a series of items
+def gen_checkin_json(name='', timein='', comments='', author='', time=''):
+    obj = {'name' : str(name), \
+           'timein' : str(timein), \
+           'comments': str(comments), \
+           'author': str(author), \
+           'time': int(time) }
+
+    return json.dumps(obj)
+
+# returns a list of json docs of the checkins from today
+
+def list_todays_checkins():
+    redis = get_redis()
+
+    out = []
+
+    for emp in get_employees():
+        # get the first element from ci:<username>, which is the most recent one
+        result = redis.lindex('ci:%s' % emp, 0)
+
+        if result is None:
+            out.append({'name' : emp, 'time' : 'NONE EVER'})
+        else:
+            obj = json.loads(result)
+
+            # if the status was less than a day ago
+            # (1 day = 86400 seconds)
+            if time.time() - int(obj['time']) <= 86400:
+                # change it from time stamp to readable string
+                obj['time'] = str(datetime.fromtimestamp(int(obj['time'])))
+
+                out.append(obj)
+            else:
+                out.append({'name' : emp, 'time': 'NONE TODAY'})
+
+    return out
+
+
+# MAIN PAGES
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -63,40 +93,6 @@ def index():
 
         return redirect(url_for('index'))
 
-def gen_checkin_json(name='', timein='', comments='', author='', time=''):
-    obj = {'name' : str(name), \
-           'timein' : str(timein), \
-           'comments': str(comments), \
-           'author': str(author), \
-           'time': int(time) }
-
-    return json.dumps(obj)
-
-def list_todays_checkins():
-    redis = get_redis()
-
-    out = []
-
-    for emp in get_employees():
-        # get the first element from ci:<username>, which is the most recent one
-        result = redis.lindex('ci:%s' % emp, 0)
-
-        if result is None:
-            out.append({'name' : emp, 'time' : 'NONE EVER'})
-        else:
-            obj = json.loads(result)
-
-            # if the status was less than a day ago
-            # (1 day = 86400 seconds)
-            if time.time() - int(obj['time']) <= 86400:
-                # change it from time stamp to readable string
-                obj['time'] = str(datetime.fromtimestamp(int(obj['time'])))
-
-                out.append(obj)
-            else:
-                out.append({'name' : emp, 'time': 'NONE TODAY'})
-
-    return out
 
 @app.route('/user/<user>', methods=['GET'])
 def userpage(user):
@@ -108,6 +104,33 @@ def userpage(user):
         ci['time'] = str(datetime.fromtimestamp(int(ci['time'])))
     
     return render_template('userpage.html', checkins=checkins, username=user)
+
+
+@app.route('/list', methods=['GET', 'POST'])
+def employeelist():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+
+    if request.method == 'GET':
+        return render_template('list.html', emps=get_employees())
+
+    elif request.method == 'POST':
+        # the user tried to remove someone
+        if 'removename' in request.form:
+            r = get_redis()
+            r.srem('employees', request.form['removename'])
+            r.delete('ci:%s' % request.form['removename'])
+
+        # the user tried to add someone
+        elif 'name' in request.form:
+            get_redis().sadd('employees', request.form['name'][:30].replace('|', ''))
+
+        return redirect(url_for('employeelist'))
+
+
+
+# APIs FOR ACCESSING DATA
+#    these just return json
 
 @app.route('/raw/status/<user>.json', methods=['GET'])
 def raw_checkin(user):
@@ -123,27 +146,8 @@ def raw_employeelist():
 
     return json.dumps(get_employees())
 
-@app.route('/list', methods=['GET', 'POST'])
-def employeelist():
-    if 'username' not in session:
-        return redirect(url_for('login'))
 
-    if request.method == 'GET':
-        return render_template('list.html', emps=get_employees())
-
-    elif request.method == 'POST':
-        # the user tried to remove someone
-        if 'removename' in request.form:
-            get_redis().srem('employees', request.form['removename'])
-
-        # the user tried to add someone
-        elif 'name' in request.form:
-            get_redis().sadd('employees', request.form['name'][:30].replace('|', ''))
-
-        return redirect(url_for('employeelist'))
-
-def get_employees():
-    return sorted(get_redis().smembers('employees'))
+# LOGIN AND SESSION STUFF
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -153,20 +157,9 @@ def login():
             session['username'] = un
             return redirect(url_for('index'))
         else:
-            return '''
-        <p>Member <b>%s</b> does not exist. Try again</p>
+            return render_template('login.html', error_message='user "%s" doesn\'t exist' % un)
 
-        <form action="" method="post">
-            <p><input type=text name=username> User Name</input></p>
-            <p><input type=submit value=Login></input></p>
-        </form>
-    ''' % un
-    return '''
-        <form action="" method="post">
-            <p><input type=text name=username> User Name</input></p>
-            <p><input type=submit value=Login></input></p>
-        </form>
-    '''
+    return render_template('login.html')
 
 @app.route('/logout')
 def logout():
@@ -174,7 +167,9 @@ def logout():
     session.pop('username', None)
     return redirect(url_for('index'))
 
-# set the secret key.  keep this really secret:
-app.secret_key = 'testicles123'
 
-app.run()
+# START SERVER
+if __name__ == "__main__":
+    app.run()
+
+
