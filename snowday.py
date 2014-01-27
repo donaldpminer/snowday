@@ -142,12 +142,13 @@ def employeelist():
 # APIs FOR ACCESSING DATA
 #    these just return json
 
-@app.route('/raw/status/<user>.json', methods=['GET'])
+@app.route('/raw/user/<user>.json', methods=['GET'])
 def raw_checkin(user):
     if 'username' not in session:
         return 'you are not logged in'
 
-    return get_redis().hget('checkins', user)
+    # convert each checkin into python, then convert the whole thing back into json
+    return json.dumps([ json.loads(ci) for ci in get_redis().lrange('ci:%s' % user, 0, -1) ])
 
 @app.route('/raw/employeelist.json', methods=['GET'])
 def raw_employeelist():
